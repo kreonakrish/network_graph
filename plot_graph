@@ -1,0 +1,127 @@
+import pandas as pd
+import networkx as nx
+import random
+from pyvis.network import Network
+from collections import defaultdict
+
+# Read data from Excel file
+file_path = 'data.xlsx'  # Replace with your Excel file path
+sheet_name = 'data'  # Specify the sheet name
+df = pd.read_excel(file_path, sheet_name=sheet_name)
+
+# Convert the dataframe to a list of dictionaries
+data = df.to_dict(orient='records')
+
+# Create a directed graph
+G = nx.DiGraph()
+
+# Count occurrences of each node
+node_count = defaultdict(int)
+
+# Add edges to the graph based on the parsed Excel data
+for row in data:
+    # Add edges with labels
+    G.add_edge(row['Legal_Entity'], row['Business_Functions'], label='Relationship')
+    G.add_edge(row['Business_Functions'], row['Cost_Center'], label='Relationship')
+    G.add_edge(row['Cost_Center'], row['Technology_LOB'], label='Relationship')
+    G.add_edge(row['Technology_LOB'], row['Project_ID'], label='Relationship')
+    G.add_edge(row['Project_ID'], row['IT_Director'], label='Relationship')
+    G.add_edge(row['IT_Director'], row['Application_Manager'], label='Relationship')
+    G.add_edge(row['Application_Manager'], row['Application'], label='Relationship')
+    technologies = row['Technologies'].split(',')
+    for tech in technologies:
+        G.add_edge(row['Application'], tech.strip(), label='Uses Technology')
+
+    # Count occurrences of each node
+    node_count[row['Legal_Entity']] += 1
+    node_count[row['Business_Functions']] += 1
+    node_count[row['Cost_Center']] += 1
+    node_count[row['Technology_LOB']] += 1
+    node_count[row['Project_ID']] += 1
+    node_count[row['IT_Director']] += 1
+    node_count[row['Application_Manager']] += 1
+    node_count[row['Application']] += 1
+    for tech in technologies:
+        node_count[tech.strip()] += 1
+
+# Generate random colors
+def random_color():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+# Assign random colors to each column
+column_names = df.columns.tolist()
+colors = {column: random_color() for column in column_names}
+
+# Create a dictionary to map each node to its color
+node_colors = {}
+for row in data:
+    node_colors[row['Legal_Entity']] = colors['Legal_Entity']
+    node_colors[row['Business_Functions']] = colors['Business_Functions']
+    node_colors[row['Cost_Center']] = colors['Cost_Center']
+    node_colors[row['Technology_LOB']] = colors['Technology_LOB']
+    node_colors[row['Project_ID']] = colors['Project_ID']
+    node_colors[row['IT_Director']] = colors['IT_Director']
+    node_colors[row['Application_Manager']] = colors['Application_Manager']
+    node_colors[row['Application']] = colors['Application']
+    technologies = row['Technologies'].split(',')
+    for tech in technologies:
+        node_colors[tech.strip()] = colors['Technologies']
+
+# Create a PyVis network
+net = Network(height='800px', width='100%', bgcolor='#ffffff', font_color='black')
+
+# Add nodes and edges to the PyVis network
+for node in G.nodes():
+    net.add_node(node, label=node, color=node_colors[node], size=node_count[node] * 10)
+
+for edge in G.edges():
+    label = G[edge[0]][edge[1]].get('label', '')
+    net.add_edge(edge[0], edge[1], title=label)  # Use 'title' for edge labels
+
+# Disable physics for fixed node positions
+net.set_options("""
+var options = {
+  "nodes": {
+    "shape": "dot",
+    "scaling": {
+      "min": 10,
+      "max": 30
+    }
+  },
+  "edges": {
+    "smooth": {
+      "type": "continuous"
+    },
+    "arrows": {
+      "to": {
+        "enabled": true,
+        "scaleFactor": 1,
+        "type": "arrow"
+      }
+    }
+  },
+  "layout": {
+    "improvedLayout": true
+  },
+  "physics": {
+    "enabled": true,
+    "barnesHut": {
+      "gravitationalConstant": -10000,
+      "springConstant": 0.0001,
+      "springLength": 100
+    },
+    "forceAtlas2Based": {
+      "gravitationalConstant": -10000,
+      "centralGravity": 0.01,
+      "springLength": 100
+    }
+  }
+}
+""")
+
+# Save the network to an HTML file
+try:
+    net.save_graph('network.html')
+    print("Interactive network visualization saved as 'network.html'. Open this file in a web browser to view the network.")
+except Exception as e:
+    print(f"Error saving the network visualization: {e}")
