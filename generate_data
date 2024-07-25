@@ -1,0 +1,23 @@
+import pandas as pd
+
+# Sample data
+data = {
+    'Legal_Entity': ['BankCorp', 'BankCorp', 'BankCorp', 'BankCorp', 'BankCorp', 'BankCorp'],
+    'Business_Functions': ['Retail Banking', 'Corporate Banking', 'Investment Banking', 'Wealth Management', 'Credit Cards', 'Loans'],
+    'Cost_Center': ['CC1001', 'CC1002', 'CC1003', 'CC1004', 'CC1005', 'CC1006'],
+    'Technology_LOB': ['RetailTech', 'CorpTech', 'InvestTech', 'WealthTech', 'CardTech', 'LoanTech'],
+    'Project_ID': ['P001', 'P002', 'P003', 'P004', 'P005', 'P006'],
+    'IT_Director': ['John Doe', 'Jane Smith', 'Jim Brown', 'Jill White', 'Jack Black', 'Julie Green'],
+    'Application_Manager': ['Alice Blue', 'Bob Yellow', 'Charlie Red', 'Dana Pink', 'Eli Grey', 'Fiona Orange'],
+    'Application': ['AppRetail', 'AppCorp', 'AppInvest', 'AppWealth', 'AppCard', 'AppLoan'],
+    'Technologies': ['Java, Oracle, MongoDB', 'Python, MySQL, Redis', 'C++, PostgreSQL, Kafka', 'Ruby, SQLite, RabbitMQ', 'PHP, MariaDB, Elasticsearch', 'Go, SQL Server, Cassandra']
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Save DataFrame to Excel
+file_path = 'banking_company_data.xlsx'
+df.to_excel(file_path, sheet_name='data', index=False)
+
+print(f"Excel file saved as '{file_path}'.")
