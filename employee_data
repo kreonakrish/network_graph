@@ -1,0 +1,54 @@
+from ldap3 import Server, Connection, ALL, NTLM, SUBTREE, ALL_ATTRIBUTES
+import pandas as pd
+
+# List of domains to query
+domains = ['naeast.ad.apple.com', 'ad.apple.com', 'apple.com']
+
+# Active Directory credentials
+username = 'your_username'
+password = 'your_password'
+
+# Base DN and search filter
+base_dn = 'DC=apple,DC=com'
+search_filter = '(objectClass=user)'
+
+# Attribute to filter by and the value to filter on
+filter_attribute = 'department'
+filter_value = 'IT'
+
+# Function to fetch employee data from a single domain
+def fetch_employee_data(domain):
+    try:
+        server = Server(domain, get_info=ALL)
+        conn = Connection(server, user=username, password=password, authentication=NTLM, auto_bind=True)
+        
+        conn.search(
+            search_base=base_dn,
+            search_filter=search_filter,
+            search_scope=SUBTREE,
+            attributes=ALL_ATTRIBUTES
+        )
+
+        employee_data = []
+        for entry in conn.entries:
+            entry_data = {attr: entry[attr].value for attr in entry.entry_attributes_as_dict}
+            if entry_data.get(filter_attribute) == filter_value:
+                employee_data.append(entry_data)
+        return employee_data
+
+    except Exception as e:
+        print(f"Error connecting to domain {domain}: {e}")
+        return []
+
+# Aggregate data from all domains
+all_employee_data = []
+for domain in domains:
+    all_employee_data.extend(fetch_employee_data(domain))
+
+# Convert to DataFrame
+df = pd.DataFrame(all_employee_data)
+
+# Save to Excel file
+output_file = 'employee_data_filtered.xlsx'
+df.to_excel(output_file, index=False)
+print(f"Filtered employee data has been saved to {output_file}")
