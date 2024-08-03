@@ -1,0 +1,162 @@
+import pandas as pd
+import networkx as nx
+from pyvis.network import Network
+from collections import defaultdict
+import random
+
+# Function to generate random colors
+def random_color():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+# Load data from files
+business_unit_file_path = 'company_business_unit_hierarchy.xlsx'
+program_file_path = 'program_data.xlsx'
+worker_file_path = 'worker_data.csv'
+
+# Load data into DataFrames
+business_unit_df = pd.read_excel(business_unit_file_path, sheet_name='data')
+program_df = pd.read_excel(program_file_path)
+worker_df = pd.read_csv(worker_file_path)
+
+# Apply filters to DataFrames (example filter)
+# Adjust these criteria based on your needs
+business_unit_filter_criteria = {
+    'parent_id': [94, 47],  # example filter
+    'child_id': [134, 161]  # example filter
+}
+
+program_filter_criteria = {
+    'app_lob_nm': ['LOB1', 'LOB2']  # example filter
+}
+
+worker_filter_criteria = {
+    'department_nm': ['HR', 'IT'],  # example filter
+}
+
+for column, values in business_unit_filter_criteria.items():
+    business_unit_df = business_unit_df[business_unit_df[column].isin(values)]
+
+for column, values in program_filter_criteria.items():
+    program_df = program_df[program_df[column].isin(values)]
+
+for column, values in worker_filter_criteria.items():
+    worker_df = worker_df[worker_df[column].isin(values)]
+
+# Merge DataFrames
+merged_df = pd.merge(worker_df, business_unit_df, left_on='cost_center_id', right_on='child_id', how='inner')
+merged_df = pd.merge(merged_df, program_df, left_on='cost_center_id', right_on='bus_unit_node_id', how='inner')
+
+# Create a directed graph
+G = nx.DiGraph()
+
+# Count occurrences of each node and edge label
+node_count = defaultdict(int)
+edge_count = defaultdict(int)
+
+# Add unique edges from the data values
+for i in range(len(merged_df)):
+    for j in range(len(merged_df.columns) - 1):
+        source = merged_df.columns[j]
+        target = merged_df.columns[j + 1]
+        source_value = merged_df.iloc[i, j]
+        target_value = merged_df.iloc[i, j + 1]
+        
+        source_node = f"{source}_{source_value}"
+        target_node = f"{target}_{target_value}"
+        
+        # Create nodes with both header and value
+        if source_node not in G.nodes:
+            G.add_node(source_node, label=f"{source}: {source_value}", title=f"{source}: {source_value}")
+        if target_node not in G.nodes:
+            G.add_node(target_node, label=f"{target}: {target_value}", title=f"{target}: {target_value}")
+        
+        # Create edge with source, target, and label
+        G.add_edge(source_node, target_node, label=str(target_value))
+        
+        # Count occurrences of each node
+        node_count[source_node] += 1
+        node_count[target_node] += 1
+        
+        # Count occurrences of each edge label
+        edge_label = (source_node, target_node)
+        edge_count[edge_label] += 1
+
+# Create a PyVis network
+net = Network(height='800px', width='100%', bgcolor='#ffffff', font_color='black', directed=True)
+
+# Add nodes to the PyVis network
+for node, data in G.nodes(data=True):
+    label = data.get('label', node.split('_')[0])  # Use formatted label
+    net.add_node(node, label=label, title=data.get('title', ''), color=random_color(), size=int(node_count[node] * 10))
+
+# Add edges to the PyVis network
+for edge in G.edges(data=True):
+    source, target = edge[0], edge[1]
+    label = edge[2].get('label', '')
+    width = int(edge_count[(source, target)])
+    net.add_edge(source, target, title=label, label=label, width=width)
+
+# Enable physics in the network options
+net.set_options("""
+{
+  "nodes": {
+    "shape": "dot",
+    "scaling": {
+      "min": 10,
+      "max": 30
+    },
+    "font": {
+      "size": 14,
+      "face": "Tahoma"
+    }
+  },
+  "edges": {
+    "smooth": {
+      "type": "continuous"
+    },
+    "arrows": {
+      "to": {
+        "enabled": true,
+        "scaleFactor": 1,
+        "type": "arrow"
+      }
+    },
+    "color": {
+      "inherit": true
+    },
+    "font": {
+      "size": 12,
+      "face": "Tahoma",
+      "align": "middle"
+    }
+  },
+  "layout": {
+    "hierarchical": {
+      "enabled": true,
+      "levelSeparation": 150,
+      "nodeSpacing": 200,
+      "treeSpacing": 200,
+      "blockShifting": true,
+      "edgeMinimization": true,
+      "parentCentralization": true,
+      "direction": "UD",
+      "sortMethod": "directed"
+    }
+  },
+  "physics": {
+    "enabled": true,
+    "hierarchicalRepulsion": {
+      "centralGravity": 0.0,
+      "springLength": 100,
+      "springConstant": 0.01,
+      "nodeDistance": 120,
+      "damping": 0.09
+    },
+    "minVelocity": 0.75,
+    "solver": "hierarchicalRepulsion"
+  }
+}
+""")
+
+# Save the network to an HTML file
+net.save_graph('combined_business_program_worker_hierarchy.html')
