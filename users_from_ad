@@ -1,0 +1,28 @@
+# Import the Active Directory module
+Import-Module ActiveDirectory
+
+# Define the path to save the output
+$outputFile = "C:\ADUserAttributesList.csv"
+
+# Define the attributes you want to retrieve
+$attributes = @(
+    'SamAccountName',
+    'SID',
+    'DisplayName',
+    'BusinessUnit',
+    'Company',
+    'Department',
+    'Title'
+)
+
+# Retrieve all users and their specified attributes
+$users = Get-ADUser -Filter * -Property $attributes
+
+# Select the desired properties
+$userData = $users | Select-Object SamAccountName, SID, DisplayName, BusinessUnit, Company, Department, Title
+
+# Export the data to a CSV file
+$userData | Export-Csv -Path $outputFile -NoTypeInformation
+
+# Inform the user that the process is complete
+Write-Output "User attribute list saved to $outputFile"
