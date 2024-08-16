@@ -1,0 +1,96 @@
+import pandas as pd
+import networkx as nx
+from pyvis.network import Network
+import random
+import numpy as np
+
+# Function to generate random colors
+def random_color():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+# Function to calculate positions in a circle
+def calculate_circle_positions(center, radius, num_nodes):
+    angles = np.linspace(0, 2 * np.pi, num_nodes, endpoint=False)
+    positions = []
+    for angle in angles:
+        x = center[0] + radius * np.cos(angle)
+        y = center[1] + radius * np.sin(angle)
+        positions.append((x, y))
+    return positions
+
+# Load data from files
+business_unit_file_path = 'company_business_unit_hierarchy.xlsx'
+program_file_path = 'program_data.xlsx'
+worker_file_path = 'worker_data.csv'
+
+# Load data into DataFrames
+business_unit_df = pd.read_excel(business_unit_file_path, sheet_name='data')
+program_df = pd.read_excel(program_file_path)
+worker_df = pd.read_csv(worker_file_path)
+
+# Merge DataFrames
+merged_df = pd.merge(worker_df, business_unit_df, left_on='cost_center_id', right_on='child_id', how='inner')
+merged_df = pd.merge(merged_df, program_df, left_on='cost_center_id', right_on='bus_unit_node_id', how='inner')
+
+# Create a directed graph
+G = nx.DiGraph()
+
+# Define specific node connections
+for _, row in merged_df.iterrows():
+    worker_node = f"Worker_{row['worker_nm']}"
+    business_unit_node = f"BU_{row['bus_unit_nm']}"
+    program_node = f"Program_{row['prod_nm']}"
+    
+    # Add nodes
+    if worker_node not in G.nodes:
+        G.add_node(worker_node, label=f"Worker: {row['worker_nm']}", title=f"Worker: {row['worker_nm']}")
+    if business_unit_node not in G.nodes:
+        G.add_node(business_unit_node, label=f"Business Unit: {row['bus_unit_nm']}", title=f"Business Unit: {row['bus_unit_nm']}")
+    if program_node not in G.nodes:
+        G.add_node(program_node, label=f"Program: {row['prod_nm']}", title=f"Program: {row['prod_nm']}")
+    
+    # Add edges based on specific logic
+    G.add_edge(worker_node, business_unit_node, label='Works In')
+    G.add_edge(business_unit_node, program_node, label='Manages')
+    G.add_edge(worker_node, program_node, label='Involved In')
+
+# Create a PyVis network
+net = Network(height='800px', width='100%', bgcolor='#ffffff', font_color='black', directed=True)
+
+# Define domains as tuples of lists (you can adjust these)
+domains = {
+    'Worker': ['worker_id', 'worker_nm', 'department_nm'],
+    'Business Unit': ['bus_unit_id', 'bus_unit_nm'],
+    'Program': ['prod_id', 'prod_nm', 'tech_owner_nm']
+}
+
+# Calculate positions and assign them to nodes
+position_map = {}
+radius = 200
+center_shift = 300
+centers = {
+    'Worker': (center_shift, center_shift),
+    'Business Unit': (center_shift * 2, center_shift),
+    'Program': (center_shift * 3, center_shift)
+}
+
+for domain, center in centers.items():
+    nodes = [node for node in G.nodes if any(col in node for col in domains[domain])]
+    positions = calculate_circle_positions(center, radius, len(nodes))
+    for node, pos in zip(nodes, positions):
+        position_map[node] = pos
+
+# Add nodes to the PyVis network with positions
+for node, data in G.nodes(data=True):
+    label = data.get('label', node.split('_')[0])  # Use formatted label
+    pos = position_map.get(node, (random.randint(0, 1000), random.randint(0, 1000)))
+    net.add_node(node, label=label, title=data.get('title', ''), color=random_color(), size=15, x=pos[0], y=pos[1])
+
+# Add edges to the PyVis network
+for edge in G.edges(data=True):
+    source, target = edge[0], edge[1]
+    label = edge[2].get('label', '')
+    net.add_edge(source, target, title=label, label=label, width=2)
+
+# Save the network to an HTML file
+net.save_graph('domain_grouped_hierarchy.html')
