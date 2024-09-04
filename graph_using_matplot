@@ -1,0 +1,72 @@
+import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# Expanded DataFrame with LoB hierarchy
+data = {
+    'Parent_LoB': ['Consumer Banking', 'Consumer Banking', 'Corporate & Investment Bank', 'Corporate & Investment Bank', 'Asset & Wealth Management', 'Asset & Wealth Management', 'Commercial Banking', 'Commercial Banking'],
+    'LoB': ['Retail Banking', 'Retail Banking', 'Investment Banking', 'Investment Banking', 'Wealth Management', 'Wealth Management', 'Commercial Banking', 'Commercial Banking'],
+    'Sub_LoB': ['Personal Banking', 'Personal Banking', 'M&A Advisory', 'Trading', 'Private Banking', 'Private Banking', 'Business Banking', 'Corporate Loans'],
+    'Manager': ['John Doe', 'John Doe', 'Jane Smith', 'Jane Smith', 'Alice Johnson', 'Alice Johnson', 'Bob Brown', 'Bob Brown'],
+    'Operation/Service': ['IT Services', 'Loan Servicing', 'IT Services', 'Trading', 'Customer Support', 'Compliance', 'Risk Management', 'Loan Servicing'],
+    'Product': ['Checking Accounts', 'Mortgages', 'M&A Advisory', 'Equity Underwriting', 'Managed Portfolios', 'Estate Planning', 'Corporate Loans', 'Business Accounts']
+}
+
+df = pd.DataFrame(data)
+
+# 1. Identify common operations/services by grouping by 'Operation/Service' and counting unique LoBs
+common_operations = df.groupby('Operation/Service')['LoB'].nunique().reset_index()
+common_operations.columns = ['Operation/Service', 'LoB_Count']
+
+# Filter operations/services that are shared across multiple LoBs
+common_operations = common_operations[common_operations['LoB_Count'] > 1]
+
+# 2. Create a network graph using networkx
+G = nx.DiGraph()
+
+# Add nodes for Parent LoBs
+parent_lobs = df['Parent_LoB'].unique()
+for plob in parent_lobs:
+    G.add_node(plob, type='parent_lob')
+
+# Add nodes for LoBs and connect them to Parent LoBs
+lobs = df['LoB'].unique()
+for lob in lobs:
+    parent_lob = df[df['LoB'] == lob]['Parent_LoB'].values[0]
+    G.add_node(lob, type='lob')
+    G.add_edge(parent_lob, lob)
+
+# Add nodes for Sub_LoBs and connect them to LoBs
+sublobs = df['Sub_LoB'].unique()
+for sublob in sublobs:
+    lob = df[df['Sub_LoB'] == sublob]['LoB'].values[0]
+    G.add_node(sublob, type='sublob')
+    G.add_edge(lob, sublob)
+
+# Add nodes for Operations/Services and connect them to Sub_LoBs
+for _, row in df.iterrows():
+    sublob = row['Sub_LoB']
+    operation = row['Operation/Service']
+    manager = row['Manager']
+    
+    G.add_node(operation, type='operation')
+    G.add_edge(sublob, operation)
+    G.add_node(manager, type='manager')
+    G.add_edge(manager, operation)
+
+# Draw the graph with a layout
+pos = nx.spring_layout(G, k=0.5, seed=42)  # Position nodes for visual appeal
+
+# Draw nodes with different colors based on type
+node_colors = ['lightblue' if G.nodes[node]['type'] == 'parent_lob' else 'skyblue' if G.nodes[node]['type'] == 'lob' else 'lightgreen' if G.nodes[node]['type'] == 'sublob' else 'orange' if G.nodes[node]['type'] == 'operation' else 'lightcoral' for node in G.nodes]
+
+# Draw the graph
+plt.figure(figsize=(14, 10))
+nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=3000, font_size=10, font_weight='bold', edge_color='gray', linewidths=1, alpha=0.9)
+
+# Highlight common operations/services
+common_ops_list = common_operations['Operation/Service'].tolist()
+nx.draw_networkx_nodes(G, pos, nodelist=common_ops_list, node_color='yellow', node_size=3500, alpha=0.7)
+
+plt.title('Hierarchy of Parent LoBs, LoBs, Sub-LoBs, and Managers with Common Operations/Services Identified')
+plt.show()
