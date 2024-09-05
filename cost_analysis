@@ -1,0 +1,114 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Function to calculate cost per project
+def calculate_project_cost(num_tables, num_pipelines, pipeline_distribution, resources_allocation, resource_costs):
+    simple_pipelines = num_pipelines * pipeline_distribution['simple'] / 100
+    medium_pipelines = num_pipelines * pipeline_distribution['medium'] / 100
+    complex_pipelines = num_pipelines * pipeline_distribution['complex'] / 100
+
+    total_cost = (simple_pipelines * resources_allocation['simple'] * resource_costs['simple'] +
+                  medium_pipelines * resources_allocation['medium'] * resource_costs['medium'] +
+                  complex_pipelines * resources_allocation['complex'] * resource_costs['complex'])
+    
+    return total_cost
+
+# Input parameters
+projects = ['Auto', 'HL', 'CBB', 'USWM', 'Proforma', 'Datamart', 'CMS']
+num_tables = {'Auto': 50, 'HL': 40, 'CBB': 30, 'USWM': 60, 'Proforma': 45, 'Datamart': 70, 'CMS': 55}
+num_pipelines = {'Auto': 20, 'HL': 15, 'CBB': 10, 'USWM': 25, 'Proforma': 18, 'Datamart': 30, 'CMS': 22}
+pipeline_distribution = {'simple': 40, 'medium': 40, 'complex': 20}  # Distribution in percentage
+resources_allocation = {'simple': 1, 'medium': 2, 'complex': 4}  # Number of resources allocated per type
+resource_costs = {'simple': 5000, 'medium': 7000, 'complex': 10000}  # Cost per resource for each type of pipeline
+
+# Input actual costs for the last 6 months (in thousands of dollars)
+actual_costs = {
+    'Auto': [80, 85, 90, 95, 100, 105],
+    'HL': [60, 65, 70, 72, 75, 78],
+    'CBB': [40, 45, 50, 55, 60, 65],
+    'USWM': [100, 105, 110, 115, 120, 125],
+    'Proforma': [70, 72, 75, 80, 85, 90],
+    'Datamart': [120, 125, 130, 135, 140, 145],
+    'CMS': [95, 100, 105, 110, 115, 120],
+}
+
+# Forecast for next 3 to 5 years
+years_to_forecast = int(input("Enter number of years to forecast (3 to 5): "))
+forecast_months = years_to_forecast * 12
+months = np.arange(1, 6 + forecast_months + 1)  # 6 actual months + forecasted months
+
+# Forecast using simple linear progression from the last actual cost
+def forecast_costs(project, actual_costs, forecast_months):
+    forecasted = np.linspace(actual_costs[-1], actual_costs[-1] * 1.5, forecast_months)  # Simple linear growth forecast
+    return np.concatenate((actual_costs, forecasted))
+
+# Initialize cumulative cost arrays
+cumulative_actual_costs = np.zeros(len(months))
+
+# Data quality tool parameters
+data_quality_support_percentage = float(input("Enter the data quality support percentage (e.g., 5 for 5% reduction): "))
+data_quality_tool_cost_monthly = float(input("Enter the monthly cost of the data quality tool (in thousands): "))
+
+# Prepare to plot
+plt.figure(figsize=(12, 8))
+
+# Plot actual and forecasted costs for each project
+for project in projects:
+    actual = np.array(actual_costs[project])
+    forecasted = forecast_costs(project, actual, forecast_months)
+    line, = plt.plot(months, forecasted, label=project, marker='o')  # Add marker to each point for hover
+    
+    # Update cumulative costs
+    cumulative_actual_costs += forecasted
+
+# Plot the cumulative cost line
+plt.plot(months, cumulative_actual_costs, label='Cumulative Cost', color='black', linewidth=2, linestyle='--', marker='o')
+
+# Calculate cumulative costs with data quality support percentage
+cumulative_reduced_costs = cumulative_actual_costs * (1 - data_quality_support_percentage / 100)
+
+# Subtract the cost of the data quality tool over time
+total_tool_costs = np.cumsum(np.full(len(months), data_quality_tool_cost_monthly))
+
+# Compensated cumulative costs (reduced cost minus the tool cost)
+cumulative_compensated_costs = cumulative_reduced_costs - total_tool_costs
+
+# Calculate cumulative cost of the tool
+cumulative_tool_cost = total_tool_costs  # This is just the accumulated monthly cost of the tool
+
+# Plot the tool cost as a separate line
+plt.plot(months, cumulative_tool_cost, label='Cumulative Tool Cost', color='orange', linewidth=2, marker='x')
+
+# Plot the reduced cumulative cost line (with tool)
+plt.plot(months, cumulative_compensated_costs, label='Cumulative Reduced Cost with Tool', color='green', linewidth=2, marker='o')
+
+# Add annotation to the tool cost line at key points
+for i, (x_value, y_value) in enumerate(zip(months, cumulative_tool_cost)):
+    if i % 12 == 0:  # Annotate every 12 months
+        plt.text(x_value, y_value, f'{y_value:.1f}', fontsize=8)
+
+# Compensation point calculation and other plotting remain the same
+
+
+# Find the month when the cumulative reduced costs exceed the original cumulative cost (compensation point)
+compensation_month = np.argmax(cumulative_compensated_costs > cumulative_actual_costs)
+if compensation_month > 0:
+    plt.axvline(x=months[compensation_month], color='blue', linestyle='--', label='Compensation Point')
+    plt.text(months[compensation_month], cumulative_compensated_costs[compensation_month],
+             f'Compensation Month: {months[compensation_month]}', color='blue', fontsize=10, fontweight='bold')
+
+# Add vertical line to separate actual and forecasted costs
+plt.axvline(x=6, color='red', linestyle='--', label='Actual vs Forecast Divider')
+
+# Add labels and title
+plt.title('Project Cost and Cumulative Forecast with Data Quality Tool Compensation')
+plt.xlabel('Months')
+plt.ylabel('Cost (in thousands of dollars)')
+plt.legend()
+plt.grid(True)
+
+# Display the plot
+plt.show()
+
+# Optional: Save the plot
+# plt.savefig('project_cost_cumulative_forecast_with_tool.png')
