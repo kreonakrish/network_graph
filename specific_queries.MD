@@ -1,4 +1,5 @@
-### **Advanced Cypher queries** These examples leverage the power of graph traversals, pattern matching, and relationship-centric insights.
+### **Advanced Cypher queries** 
+### **These examples leverage the power of graph traversals, pattern matching, and relationship-centric insights.**
 
 ---
 
